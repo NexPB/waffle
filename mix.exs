@@ -1,7 +1,7 @@
 defmodule Waffle.Mixfile do
   use Mix.Project
 
-  @version "1.0.0"
+  @version "1.1.3"
 
   def project do
     [
@@ -35,7 +35,10 @@ defmodule Waffle.Mixfile do
   defp docs do
     [
       main: "Waffle",
-      extras: ["documentation/examples/full.md"]
+      extras: [
+        "documentation/examples/local.md",
+        "documentation/examples/s3.md"
+      ]
     ]
   end
 
@@ -57,7 +60,7 @@ defmodule Waffle.Mixfile do
       {:hackney, "~> 1.9"},
 
       # If using Amazon S3
-      {:ex_aws, "~> 2.1", optional: true},
+      {:ex_aws, "~> 2.1.2", optional: true},
       {:ex_aws_s3, "~> 2.0", optional: true},
       {:sweet_xml, "~> 0.6", optional: true},
 
@@ -68,7 +71,7 @@ defmodule Waffle.Mixfile do
       {:ex_doc, "~> 0.21", only: :dev},
 
       # Dev, Test
-      {:credo, "~> 1.1.0", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 end
