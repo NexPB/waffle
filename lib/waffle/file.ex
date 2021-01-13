@@ -17,6 +17,7 @@ defmodule Waffle.File do
     uri = URI.parse(remote_path)
     filename = uri.path |> Path.basename() |> URI.decode()
     filename = if uri.host == "media.tenor.com", do: filename <> ".mp4", else: filename
+    # COMBAK: Find a better way to handle no extensions on filenames.
 
     case save_file(uri, filename, definition) do
       {:ok, local_path, filename_from_content_disposition} ->
