@@ -184,6 +184,7 @@ defmodule Waffle.File do
   end
 
   defp request(remote_path, headers, options, tries \\ 0) do
+    options = maybe_modify_options(options)
     case :hackney.get(URI.to_string(remote_path), headers, "", options) do
       {:ok, 200, response_headers, client_ref} ->
         {:ok, body} = :hackney.body(client_ref)
