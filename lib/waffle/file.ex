@@ -207,6 +207,14 @@ defmodule Waffle.File do
     end
   end
 
+  defp maybe_modify_options(%{host: "media.tenor.com"}, options) do
+    Keyword.put(options, :hackney, [:insecure])
+  end
+
+  defp maybe_modify_options(_, options) do
+    options
+  end
+
   defp content_disposition(headers) do
     case :hackney_headers.get_value("content-disposition", headers) do
       :undefined ->
