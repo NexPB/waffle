@@ -16,8 +16,6 @@ defmodule Waffle.File do
   def new(remote_path = "http" <> _, definition) do
     uri = URI.parse(remote_path)
     filename = uri.path |> Path.basename() |> URI.decode()
-    filename = if uri.host == "media.tenor.com", do: filename <> ".mp4", else: filename
-    # COMBAK: Find a better way to handle no extensions on filenames.
 
     case save_file(uri, filename, definition) do
       {:ok, local_path, filename_from_content_disposition} ->
@@ -139,7 +137,7 @@ defmodule Waffle.File do
   defp save_file(uri, filename, definition) do
     local_path =
       generate_temporary_path()
-      |> Kernel.<>(Path.extname(filename))
+      |> Kernel.<>(fetch_filename_extension_from_url(uri, filename))
 
     case save_temp_file(local_path, uri, definition) do
       {:ok, filename} -> {:ok, local_path, filename}
@@ -222,6 +220,24 @@ defmodule Waffle.File do
           _ ->
             nil
         end
+    end
+  end
+
+  defp fetch_filename_extension_from_url(%URI{} = uri, filename) do
+    fetch_filename_extension_from_url(URI.to_string(uri), filename)
+  end
+
+  defp fetch_filename_extension_from_url(url, filename) do
+    with {:ok, _status, headers} <- :hackney.head(url) do
+      content_type = headers |> Map.new() |> Map.get("Content-Type")
+
+      case content_type do
+        "image/gif" -> ".gif"
+        "video/mp4" -> ".mp4"
+        _ -> filename |> Path.extname()
+      end
+    else
+      _ -> filename |> Path.extname()
     end
   end
 
