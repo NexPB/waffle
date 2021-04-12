@@ -6,26 +6,30 @@ defmodule Waffle.Definition.Storage do
 
   ## Storage directory
 
+  By default, the storage directory is `uploads`. But, it can be customized
+  in two ways.
+
+  ### By setting up configuration
+
+  Customize storage directory via configuration option `:storage_dir`.
+
       config :waffle,
         storage_dir: "my/dir"
 
-  The storage directory to place files. Defaults to `uploads`, but can
-  be overwritten via configuration options `:storage_dir`
+  ### By overriding the relevent functions in definition modules
 
-  The storage dir can also be overwritten on an individual basis, in
-  each separate definition. A common pattern for user profile pictures
-  is to store each user's uploaded images in a separate subdirectory
-  based on their primary key:
+  Every definition module has a default `storage_dir/2` which is overridable.
+
+  For example, a common pattern for user avatars is to store each user's
+  uploaded images in a separate subdirectory based on primary key:
 
       def storage_dir(version, {file, scope}) do
         "uploads/users/avatars/#{scope.id}"
       end
 
-
   > **Note**: If you are "attaching" a file to a record on creation (eg, while inserting the record at the same time), then you cannot use the model's `id` as a path component.  You must either (1) use a different storage path format, such as UUIDs, or (2) attach and update the model after an id has been given. [Read more about how to integrate it with Ecto](https://hexdocs.pm/waffle_ecto/filepath-with-id.html#content)
 
   > **Note**: The storage directory is used for both local filestorage (as the relative or absolute directory), and S3 storage, as the path name (not including the bucket).
-
 
   ## Asynchronous File Uploading
 
@@ -33,36 +37,36 @@ defmodule Waffle.Definition.Storage do
   version is processed and stored concurrently as independent Tasks.
   To prevent an overconsumption of system resources, each Task is
   given a specified timeout to wait, after which the process will
-  fail.  By default this is `15 seconds`.
+  fail.  By default, the timeout is `15_000` milliseconds.
 
   If you wish to change the time allocated to version transformation
-  and storage, you may add a configuration parameter:
+  and storage, you can add a configuration option:
 
       config :waffle,
         :version_timeout, 15_000 # milliseconds
 
   To disable asynchronous processing, add `@async false` to your
-  upload definition.
+  definition module.
 
   ## Storage of files
 
-  Waffle currently supports
+  Waffle currently supports:
 
-    * `Waffle.Storage.S3`
     * `Waffle.Storage.Local`
+    * `Waffle.Storage.S3`
 
   Override the `__storage` function in your definition module if you
   want to use a different type of storage for a particular uploader.
 
   ## File Validation
 
-  While storing files on S3 (rather than your harddrive) eliminates
-  some malicious attack vectors, it is strongly encouraged to validate
-  the extensions of uploaded files as well.
+  While storing files on S3 eliminates some malicious attack vectors,
+  it is strongly encouraged to validate the extensions of uploaded
+  files as well.
 
   Waffle delegates validation to a `validate/1` function with a tuple
-  of the file and scope.  As an example, to validate that an uploaded
-  file conforms to popular image formats, you may use:
+  of the file and scope.  As an example, in order to validate that an
+  uploaded file conforms to popular image formats, you can use:
 
       defmodule Avatar do
         use Waffle.Definition
@@ -74,9 +78,28 @@ defmodule Waffle.Definition.Storage do
         end
       end
 
-  Any uploaded file failing validation will return `{:error,
-  :invalid_file}` when passed through to `Avatar.store`.
+  Any uploaded file failing validation will return `{:error, :invalid_file}` when
+  passed through to `Avatar.store`.
 
+  ## Passing custom headers when downloading from remote path
+
+  By default, when downloading files from remote path request headers are empty,
+  but if you wish to provide your own, you can override the `remote_file_headers/1`
+  function in your definition module. For example:
+
+      defmodule Avatar do
+        use Waffle.Definition
+
+        def remote_file_headers(%URI{host: "elixir-lang.org"}) do
+          credentials = Application.get_env(:my_app, :avatar_credentials)
+          token = Base.encode64(credentials[:username] <> ":" <> credentials[:password])
+
+          [{"Authorization", "Basic #{token}")}]
+        end
+      end
+
+  This code would authenticate request only for specific domain. Otherwise, it would send
+  empty request headers.
 
   """
   defmacro __using__(_) do
@@ -113,6 +136,7 @@ defmodule Waffle.Definition.Storage do
       def acl(_, _), do: @acl
       def s3_object_headers(_, _), do: []
       def async, do: @async
+      def remote_file_headers(_), do: []
     end
   end
 end

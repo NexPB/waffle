@@ -2,7 +2,7 @@ defmodule WaffleTest.Actions.Store do
   use ExUnit.Case, async: false
 
   @img "test/support/image.png"
-  @remote_img_with_space "https://github.com/elixir-waffle/waffle/blob/master/test/support/image%20two.png"
+  @remote_img_with_space_image_two "https://github.com/elixir-waffle/waffle/blob/master/test/support/image%20two.png"
 
   import Mock
 
@@ -16,6 +16,15 @@ defmodule WaffleTest.Actions.Store do
     def transform(:skipped, _), do: :skip
     def transform(_, _), do: :noaction
     def __versions, do: [:original, :thumb, :skipped]
+  end
+
+  defmodule DummyDefinitionWithHeaders do
+    use Waffle.Actions.Store
+    use Waffle.Definition.Storage
+
+    def transform(_, _), do: :noaction
+    def __versions, do: [:original, :thumb, :skipped]
+    def remote_file_headers(%URI{host: "www.google.com"}), do: [{"User-Agent", "MyApp"}]
   end
 
   test "checks file existance" do
@@ -98,12 +107,57 @@ defmodule WaffleTest.Actions.Store do
     end
   end
 
+  test "sets remote filename from content-disposition header when available" do
+    with_mocks([
+      {
+        :hackney_headers,
+        [:passthrough],
+        get_value: fn "content-disposition", _headers ->
+          "attachment; filename=\"image three.png\""
+        end
+      },
+      {
+        Waffle.Storage.S3,
+        [],
+        put: fn DummyDefinition, _, {%{file_name: "image three.png", path: _}, nil} ->
+          {:ok, "image three.png"}
+        end
+      }
+    ]) do
+      assert DummyDefinition.store(@remote_img_with_space_image_two) ==
+               {:ok, "image three.png"}
+    end
+  end
+
+  test "sets HTTP headers for request to remote file" do
+    with_mocks([
+      {
+        :hackney,
+        [:passthrough],
+        []
+      },
+      {
+        Waffle.Storage.S3,
+        [],
+        put: fn DummyDefinitionWithHeaders, _, {%{file_name: "favicon.ico", path: _}, nil} ->
+          {:ok, "favicon.ico"}
+        end
+      }
+    ]) do
+      DummyDefinitionWithHeaders.store("https://www.google.com/favicon.ico")
+
+      assert_called(
+        :hackney.get("https://www.google.com/favicon.ico", [{"User-Agent", "MyApp"}], "", :_)
+      )
+    end
+  end
+
   test "accepts remote files with spaces" do
     with_mock Waffle.Storage.S3,
       put: fn DummyDefinition, _, {%{file_name: "image two.png", path: _}, nil} ->
         {:ok, "image two.png"}
       end do
-      assert DummyDefinition.store(@remote_img_with_space) == {:ok, "image two.png"}
+      assert DummyDefinition.store(@remote_img_with_space_image_two) == {:ok, "image two.png"}
     end
   end
 
